@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mastra Workflow — Demo</title>
+  <style>
+    :root {
+      --bg: #0b0d10;
+      --panel: #14181d;
+      --border: #232a32;
+      --text: #e6edf3;
+      --muted: #8b97a4;
+      --accent: #4f8cff;
+      --ok: #3fb950;
+      --err: #f85149;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    header {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+    header .pill {
+      font-size: 11px; padding: 2px 8px; border-radius: 999px;
+      background: var(--panel); color: var(--muted); border: 1px solid var(--border);
+    }
+    main {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      padding: 16px 24px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .panel h2 { font-size: 13px; margin: 0 0 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    input, textarea, select {
+      width: 100%; background: var(--bg); color: var(--text);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 8px 10px; font-family: inherit; font-size: 13px;
+    }
+    textarea { font-family: var(--mono); min-height: 100px; resize: vertical; }
+    .row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+    button {
+      background: var(--accent); color: white; border: 0; border-radius: 6px;
+      padding: 10px 16px; font-weight: 600; cursor: pointer; font-size: 13px;
+    }
+    button.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .examples { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .examples button { font-size: 11px; padding: 4px 10px; background: transparent; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; }
+    .examples button:hover { color: var(--text); border-color: var(--accent); }
+    pre { font-family: var(--mono); font-size: 12px; white-space: pre-wrap; word-break: break-word; margin: 0; color: var(--text); }
+    .step { padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border); margin-bottom: 6px; font-size: 12px; }
+    .step.ok { border-left: 3px solid var(--ok); }
+    .step.err { border-left: 3px solid var(--err); }
+    .step .meta { color: var(--muted); margin-left: 6px; }
+    canvas { width: 100% !important; height: auto !important; max-height: 400px; }
+    .status { font-size: 11px; color: var(--muted); margin-top: 8px; }
+    .status.err { color: var(--err); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Mastra Workflow</h1>
+    <span class="pill">Demo client</span>
+  </header>
+  <main>
+    <section class="panel">
+      <h2>Request</h2>
+      <div class="row">
+        <div><label>Tenant ID</label><input id="tenant" value="demo" /></div>
+        <div><label>User ID</label><input id="user" value="demo-user" /></div>
+        <div><label>Roles</label><input id="roles" value="admin" /></div>
+      </div>
+      <label>Prompt</label>
+      <textarea id="prompt" placeholder="e.g. Search for 2025 quarterly revenue and produce a bar chart titled '2025 Sales by Quarter'."></textarea>
+      <div class="examples" id="examples"></div>
+      <div style="display: flex; gap: 8px; margin-top: 8px;">
+        <button id="planBtn" class="secondary">Plan only</button>
+        <button id="runBtn">Run</button>
+      </div>
+      <div id="status" class="status"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Plan (IR)</h2>
+      <pre id="planOut">—</pre>
+    </section>
+
+    <section class="panel">
+      <h2>Step results</h2>
+      <div id="stepsOut">—</div>
+    </section>
+
+    <section class="panel">
+      <h2>Output</h2>
+      <pre id="answerOut">—</pre>
+      <canvas id="chart" style="margin-top: 12px; display: none;"></canvas>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0"></script>
+  <script>
+    const EXAMPLES = [
+      'Create a model called "SalesForecast" on dataset "sales_data" with inputs [year, revenue].',
+      'Add a dataset called "sales_data" sourced from file.csv, then link it to the SalesForecast model.',
+      'Establish a one-to-many relationship from User to Order.',
+      'Search for 2025 quarterly revenue and produce a bar chart titled "2025 Sales by Quarter".',
+      'How many models exist?',
+    ];
+    const examplesEl = document.getElementById('examples');
+    EXAMPLES.forEach((ex) => {
+      const b = document.createElement('button');
+      b.textContent = ex.length > 60 ? ex.slice(0, 57) + '…' : ex;
+      b.title = ex;
+      b.onclick = () => (document.getElementById('prompt').value = ex);
+      examplesEl.appendChild(b);
+    });
+
+    let chartInstance = null;
+
+    function headers() {
+      return {
+        'Content-Type': 'application/json',
+        'X-Tenant-Id': document.getElementById('tenant').value.trim() || 'demo',
+        'X-User-Id': document.getElementById('user').value.trim() || 'demo-user',
+        'X-Roles': document.getElementById('roles').value.trim() || 'viewer',
+      };
+    }
+
+    async function call(path) {
+      const prompt = document.getElementById('prompt').value.trim();
+      if (!prompt) {
+        setStatus('Enter a prompt first.', true);
+        return;
+      }
+      setStatus('Calling ' + path + '…');
+      try {
+        const res = await fetch(path, {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({ prompt }),
+        });
+        const json = await res.json();
+        if (!res.ok) {
+          setStatus(`HTTP ${res.status}: ${json.error?.message ?? 'unknown error'}`, true);
+          document.getElementById('planOut').textContent = JSON.stringify(json, null, 2);
+          return;
+        }
+        render(json);
+        setStatus('OK');
+      } catch (e) {
+        setStatus(String(e), true);
+      }
+    }
+
+    function render(json) {
+      // Plan can come from /api/plan (just `{plan}`) or /api/orchestrate (full result).
+      const plan = json.plan;
+      document.getElementById('planOut').textContent = plan ? JSON.stringify(plan, null, 2) : '—';
+
+      const stepsEl = document.getElementById('stepsOut');
+      stepsEl.innerHTML = '';
+      const results = json.results ?? [];
+      if (!results.length) stepsEl.textContent = '—';
+      for (const r of results) {
+        const div = document.createElement('div');
+        div.className = 'step ' + (r.ok ? 'ok' : 'err');
+        const symbol = r.ok ? '✓' : '✗';
+        div.innerHTML =
+          `<strong>${symbol} step ${r.stepId}</strong> ${r.agent}.${r.action}` +
+          `<span class="meta"> · ${r.durationMs}ms</span>` +
+          (r.error ? `<div style="color:var(--err);margin-top:4px;">${r.error.message}</div>` : '');
+        stepsEl.appendChild(div);
+      }
+
+      document.getElementById('answerOut').textContent = json.answer ?? '—';
+
+      const charts = json.charts ?? [];
+      const canvas = document.getElementById('chart');
+      if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+      if (charts.length > 0) {
+        canvas.style.display = 'block';
+        chartInstance = new Chart(canvas.getContext('2d'), charts[0].config);
+      } else {
+        canvas.style.display = 'none';
+      }
+    }
+
+    function setStatus(msg, isErr = false) {
+      const el = document.getElementById('status');
+      el.textContent = msg;
+      el.className = 'status' + (isErr ? ' err' : '');
+    }
+
+    document.getElementById('runBtn').onclick = () => call('/api/orchestrate');
+    document.getElementById('planBtn').onclick = () => call('/api/plan');
+  </script>
+</body>
+</html>

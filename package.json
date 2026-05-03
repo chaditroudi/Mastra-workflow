@@ -1,0 +1,41 @@
+{
+  "name": "mastra-workflow-system",
+  "version": "0.1.0",
+  "description": "Multi-agent workflow automation built on Mastra: Supervisor + MongoDB / Search / Chart agents driven by an NL→IR planner.",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsx watch src/server.ts",
+    "cli": "tsx src/index.ts",
+    "seed": "tsx src/seed.ts",
+    "mcp": "tsx src/mcp-server.ts",
+    "mcp:http": "MCP_TRANSPORT=http tsx src/mcp-server.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^1.0.0",
+    "@mastra/core": "^0.10.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "express": "^4.21.0",
+    "mongodb": "^6.10.0",
+    "pino": "^9.5.0",
+    "pino-pretty": "^11.3.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.9.0",
+    "@types/supertest": "^7.2.0",
+    "mongodb-memory-server": "^10.4.3",
+    "supertest": "^7.2.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.5"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
